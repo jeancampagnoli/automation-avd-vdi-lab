@@ -1,8 +1,11 @@
+run-name: Deploy request ${{ github.event.inputs.vmName }}
+
 name: AVD-VDI Lab Pipeline
 
 on:
   workflow_dispatch:
     inputs:
+
       action:
         description: "Choose script to run"
         required: true
@@ -10,10 +13,9 @@ on:
         options:
           - create-avd
           - restart-avd
-          - remove-avd
           - create-vdi
           - restart-vdi
-          - remove-vdi
+          # remove scripts blocked intentionally
 
       vmName:
         description: "Machine name"
@@ -23,47 +25,100 @@ on:
         description: "Pool / HostPool name"
         required: true
 
+      subnet:
+        description: "Subnet"
+        required: true
+
+      costCenter:
+        description: "Centro de custo"
+        required: true
+
+      ritm:
+        description: "RITM (ServiceNow)"
+        required: true
+
 jobs:
 
-  validate:
+# ======================================================
+# 1️⃣ BUILD
+# ======================================================
+
+  Build:
     runs-on: windows-latest
 
     steps:
-      - name: Show Parameters
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: Show Inputs
         shell: pwsh
         run: |
+          Write-Host "Action:" "${{ github.event.inputs.action }}"
           Write-Host "VM:" "${{ github.event.inputs.vmName }}"
           Write-Host "Pool:" "${{ github.event.inputs.pool }}"
-          Write-Host "Action:" "${{ github.event.inputs.action }}"
+          Write-Host "Subnet:" "${{ github.event.inputs.subnet }}"
+          Write-Host "CostCenter:" "${{ github.event.inputs.costCenter }}"
+          Write-Host "RITM:" "${{ github.event.inputs.ritm }}"
 
-  approve:
-    needs: validate
+# ======================================================
+# 2️⃣ TESTING
+# ======================================================
+
+  Testing:
+    needs: Build
+    runs-on: windows-latest
+
+    steps:
+      - name: Validate Naming Pattern
+        shell: pwsh
+        run: |
+          if("${{ github.event.inputs.vmName }}".Length -lt 3){
+            throw "VM name invalid"
+          }
+
+          if("${{ github.event.inputs.ritm }}" -notmatch "^RITM"){
+            throw "RITM must start with RITM"
+          }
+
+          Write-Host "Basic validation passed"
+
+# ======================================================
+# 3️⃣ APPROVE
+# ======================================================
+
+  Approve:
+    needs: Testing
     runs-on: windows-latest
     environment:
       name: manual-approval
 
     steps:
-      - run: echo "Waiting approval..."
+      - run: echo "Waiting manual approval"
 
-  execute:
-    needs: approve
+# ======================================================
+# 4️⃣ DEPLOY
+# ======================================================
+
+  Deploy:
+    needs: Approve
     runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v3
 
-      - name: Run Script
+      - name: Execute Script
         shell: pwsh
         run: |
+
           $action = "${{ github.event.inputs.action }}"
 
           switch ($action) {
 
-            "create-avd" { ./scripts/create-VM-AVD.ps1 }
+            "create-avd"  { ./scripts/create-VM-AVD.ps1 }
             "restart-avd" { ./scripts/reiniciar-VM-AVD.ps1 }
-            "remove-avd" { ./scripts/remover-VM-AVD.ps1 }
 
-            "create-vdi" { ./scripts/create-VM-VDI.ps1 }
+            "create-vdi"  { ./scripts/create-VM-VDI.ps1 }
             "restart-vdi" { ./scripts/reiniciar-VM-VDI.ps1 }
-            "remove-vdi" { ./scripts/remover-VM-VDI.ps1 }
+
+            default { throw "Action not allowed" }
           }
