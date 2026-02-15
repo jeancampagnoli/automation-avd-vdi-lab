@@ -1,0 +1,15 @@
+#Remover
+
+param(
+    [string]$VMName
+)
+
+Write-Host "Removing $VMName..."
+
+try {
+    Stop-VM -VM $VMName -Confirm:$false
+    Remove-VM -VM $VMName -DeletePermanently -Confirm:$false
+}
+catch {
+    Write-Error $_
+}
