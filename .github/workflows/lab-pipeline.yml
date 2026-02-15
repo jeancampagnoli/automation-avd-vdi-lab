@@ -61,23 +61,10 @@ jobs:
           Write-Host "RITM:" "${{ github.event.inputs.ritm }}"
 
 # ======================================================
-# 2️⃣APPROVE
+#  2️⃣APPROVE
 # ======================================================
 
   Approve:
-    needs: Testing
-    runs-on: windows-latest
-    environment:
-      name: manual-approval
-
-    steps:
-      - run: echo "Waiting manual approval"
-
-# ======================================================
-#  3️⃣TESTING
-# ======================================================
-
-  Testing:
     needs: Build
     runs-on: windows-latest
 
@@ -96,11 +83,24 @@ jobs:
           Write-Host "Basic validation passed"
 
 # ======================================================
+# 3️⃣TESTING
+# ======================================================
+
+  Testing:
+    needs: Approve
+    runs-on: windows-latest
+    environment:
+      name: manual-approval
+
+    steps:
+      - run: echo "Waiting manual approval"
+
+# ======================================================
 # 4️⃣ DEPLOY
 # ======================================================
 
   Deploy:
-    needs: Approve
+    needs: Testing
     runs-on: windows-latest
 
     steps:
